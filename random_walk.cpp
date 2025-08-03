@@ -57,7 +57,7 @@ void walker_process()
 
     // TODO: Implement the random walk logic for a walker process.
     // 1. Initialize the walker's position to 0.
-    // 2. Loop for a maximum of `max_steps`.
+    // 2. Loop for a maximum of max_steps.
     // 3. In each step, randomly move left (-1) or right (+1).
     // 4. Check if the walker has moved outside the domain [-domain_size, +domain_size].
     // 5. If the walk is finished (either out of bounds or max_steps reached):
@@ -65,6 +65,27 @@ void walker_process()
     //       "Rank X: Walker finished in Y steps."
     //    b. Send an integer message to the controller (rank 0) to signal completion.
     //    c. Break the loop.
+    //
+    int position=0;
+    int walk_distance=0;
+    int steps;
+    for(steps=0; steps<max_steps; ++steps) {
+        walk_distance = (rand() % 2 == 0)? 1 : -1;
+        position += walk_distance;
+        if (position > domain_size || position < (domain_size * -1)) {
+            break;
+        } 
+    }
+    std::cout << "Rank " << world_rank << ": Walker finished in " << steps << " steps." << std::endl;
+    MPI_Send(
+        &world_rank,      // Pointer to the data to send
+        1,                  // Number of elements to send
+        MPI_INT,            // Data type of the elements
+        0,   // Rank of the destination process
+        0,                // A message tag (like a message type)
+        MPI_COMM_WORLD      // The communicator
+    );
+
 }
 
 void controller_process()
@@ -76,4 +97,21 @@ void controller_process()
     //    a message from any walker that finishes.
     // 4. After receiving messages from all walkers, print a final summary message.
     //    For example: "Controller: All X walkers have finished."
+    int checkFinish=0;
+    int no_walkers=(world_size/2)*(world_size - 1);
+    int received_data;
+    while (checkFinish != no_walkers) {
+        received_data = 0;
+        MPI_Recv(
+            &received_data,     // Pointer to the buffer for incoming data
+            1,                  // Max number of elements to receive
+            MPI_INT,            // Data type of the elements
+            MPI_ANY_SOURCE,        // Rank of the source process
+            0,                // The message tag to look for
+            MPI_COMM_WORLD,     // The communicator
+            MPI_STATUS_IGNORE // Pointer to the status object
+        );
+        checkFinish += received_data;
+    }
+    std::cout << "Controller: All " << world_size - 1 << " walkers have finished." << std::endl;
 }
